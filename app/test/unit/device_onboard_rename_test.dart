@@ -202,7 +202,8 @@ void main() {
       expect(updatedDevice.name, 'Omi DevKit');
     });
 
-    test('onboard rename keeps displayed and cached name strictly equal to onboard value for multi-byte UTF-8', () async {
+    test('onboard rename keeps displayed and cached name strictly equal to onboard value for multi-byte UTF-8',
+        () async {
       final transport = _MockTransport(testDeviceId);
       final baseDevice = BtDevice(
         id: testDeviceId,
@@ -225,7 +226,7 @@ void main() {
 
       // Set the characteristic to simulate hardware storage
       transport.characteristics[
-          '${OmiDeviceConnection.settingsServiceUuid}/${OmiDeviceConnection.settingsDeviceNameCharacteristicUuid}'] =
+              '${OmiDeviceConnection.settingsServiceUuid}/${OmiDeviceConnection.settingsDeviceNameCharacteristicUuid}'] =
           writtenBytes;
 
       // Read back via getDeviceInfo and prove returned BtDevice.name matches onboardName exactly

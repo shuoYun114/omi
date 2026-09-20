@@ -325,6 +325,7 @@ class _DeviceSettingsState extends State<DeviceSettings> {
                           }
 
                           final scaffoldMessenger = ScaffoldMessenger.of(context);
+                          final deviceNameLabel = context.l10n.deviceName;
                           setDialogState(() => isSaving = true);
                           try {
                             final connection = await ServiceManager.instance().device.ensureConnection(device.id);
@@ -351,7 +352,7 @@ class _DeviceSettingsState extends State<DeviceSettings> {
                               Navigator.of(dialogContext).pop();
                             }
                             scaffoldMessenger.showSnackBar(
-                              SnackBar(content: Text('${context.l10n.deviceName}: $confirmedName')),
+                              SnackBar(content: Text('$deviceNameLabel: $confirmedName')),
                             );
                           } catch (e) {
                             Logger.error('Failed to rename device: $e');
