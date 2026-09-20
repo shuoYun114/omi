@@ -201,5 +201,37 @@ void main() {
       final updatedDevice = await baseDevice.getDeviceInfo(connection);
       expect(updatedDevice.name, 'Omi DevKit');
     });
+
+    test('onboard rename keeps displayed and cached name strictly equal to onboard value for multi-byte UTF-8', () async {
+      final transport = _MockTransport(testDeviceId);
+      final baseDevice = BtDevice(
+        id: testDeviceId,
+        name: 'Omi DevKit',
+        type: DeviceType.omi,
+        rssi: -55,
+        locator: DeviceLocator.bluetooth(deviceId: testDeviceId),
+      );
+      final connection = OmiDeviceConnection(baseDevice, transport);
+
+      // 10 Chinese characters = 30 bytes (exceeds 25 bytes budget)
+      const inputName = "一二三四五六七八九十";
+      await connection.performSetDeviceName(inputName);
+
+      // Verify the transport stored the clamped 24-byte string ("一二三四五六七八")
+      final writtenBytes = transport.writeCalls.last['data'] as List<int>;
+      expect(writtenBytes.length, 24);
+      final onboardName = utf8.decode(writtenBytes);
+      expect(onboardName, "一二三四五六七八");
+
+      // Set the characteristic to simulate hardware storage
+      transport.characteristics[
+          '${OmiDeviceConnection.settingsServiceUuid}/${OmiDeviceConnection.settingsDeviceNameCharacteristicUuid}'] =
+          writtenBytes;
+
+      // Read back via getDeviceInfo and prove returned BtDevice.name matches onboardName exactly
+      final updatedDevice = await baseDevice.getDeviceInfo(connection);
+      expect(updatedDevice.name, onboardName);
+      expect(updatedDevice.name, isNot(equals(inputName)));
+    });
   });
 }

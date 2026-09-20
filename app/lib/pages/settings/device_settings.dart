@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:omi/utils/platform/platform_manager.dart';
 import 'package:flutter/material.dart';
@@ -244,12 +245,16 @@ class _DeviceSettingsState extends State<DeviceSettings> {
   void _showRenameDeviceDialog(BtDevice device, DeviceProvider provider) {
     final textController = TextEditingController(text: device.name);
     bool isSaving = false;
+    String? errorMessage;
 
     showDialog(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
+            final currentBytes = utf8.encode(textController.text.trim()).length;
+            final isTooLong = currentBytes > 25;
+
             return AlertDialog(
               backgroundColor: const Color(0xFF1C1C1E),
               title: Text(
@@ -265,10 +270,22 @@ class _DeviceSettingsState extends State<DeviceSettings> {
                     autofocus: true,
                     maxLength: 25,
                     style: const TextStyle(color: Colors.white),
+                    onChanged: (val) {
+                      setDialogState(() {
+                        final bytes = utf8.encode(val.trim()).length;
+                        if (bytes > 25) {
+                          errorMessage = 'Max 25 bytes ($bytes bytes, non-ASCII uses multiple bytes)';
+                        } else {
+                          errorMessage = null;
+                        }
+                      });
+                    },
                     decoration: InputDecoration(
                       hintText: device.name,
                       hintStyle: const TextStyle(color: Color(0xFF8E8E93)),
                       counterStyle: const TextStyle(color: Color(0xFF8E8E93)),
+                      errorText: errorMessage,
+                      errorStyle: const TextStyle(color: Colors.redAccent, fontSize: 12),
                       enabledBorder: const UnderlineInputBorder(
                         borderSide: BorderSide(color: Color(0xFF3C3C43)),
                       ),
@@ -288,7 +305,7 @@ class _DeviceSettingsState extends State<DeviceSettings> {
                   ),
                 ),
                 TextButton(
-                  onPressed: isSaving
+                  onPressed: (isSaving || isTooLong)
                       ? null
                       : () async {
                           final newName = textController.text.trim();
@@ -299,8 +316,15 @@ class _DeviceSettingsState extends State<DeviceSettings> {
                             return;
                           }
 
+                          final byteCount = utf8.encode(newName).length;
+                          if (byteCount > 25) {
+                            setDialogState(() {
+                              errorMessage = 'Max 25 bytes ($byteCount bytes, non-ASCII uses multiple bytes)';
+                            });
+                            return;
+                          }
+
                           final scaffoldMessenger = ScaffoldMessenger.of(context);
-                          final successMessage = '${context.l10n.deviceName}: $newName';
                           setDialogState(() => isSaving = true);
                           try {
                             final connection = await ServiceManager.instance().device.ensureConnection(device.id);
@@ -314,19 +338,20 @@ class _DeviceSettingsState extends State<DeviceSettings> {
                               return;
                             }
                             await connection.setDeviceName(newName);
-                            provider.pairedDevice = provider.pairedDevice?.copyWith(name: newName);
+                            await provider.refreshDeviceInfo();
+                            final confirmedName = provider.pairedDevice?.name ?? newName;
+                            provider.pairedDevice = provider.pairedDevice?.copyWith(name: confirmedName);
                             if (provider.connectedDevice?.id == device.id) {
-                              provider.connectedDevice = provider.connectedDevice?.copyWith(name: newName);
+                              provider.connectedDevice = provider.connectedDevice?.copyWith(name: confirmedName);
                             }
                             if (provider.pairedDevice != null) {
                               SharedPreferencesUtil().btDevice = provider.pairedDevice!;
                             }
-                            await provider.refreshDeviceInfo();
                             if (dialogContext.mounted) {
                               Navigator.of(dialogContext).pop();
                             }
                             scaffoldMessenger.showSnackBar(
-                              SnackBar(content: Text(successMessage)),
+                              SnackBar(content: Text('${context.l10n.deviceName}: $confirmedName')),
                             );
                           } catch (e) {
                             Logger.error('Failed to rename device: $e');
@@ -346,7 +371,10 @@ class _DeviceSettingsState extends State<DeviceSettings> {
                         )
                       : Text(
                           context.l10n.confirm,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: isTooLong ? Colors.grey : Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                 ),
               ],
