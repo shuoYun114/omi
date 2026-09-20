@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -237,5 +238,77 @@ void main() {
       expect(triggerButtonAction(start.add(const Duration(milliseconds: 401))), isTrue);
       expect(firedCount, equals(2));
     });
+
+    test(
+      'Second End/Process press after 400ms debounce while backend is still processing is blocked by in-flight guard',
+      () async {
+        DateTime? lastActionTime;
+        const debounce = Duration(milliseconds: 400);
+        bool isForceProcessing = false;
+        int backendProcessingChainStarted = 0;
+        final sentinelProcessingIds = <String>[];
+
+        Future<bool> handleButtonPress(DateTime now, {required Future<void> Function() backendWork}) async {
+          // 1. Debounce check
+          if (lastActionTime != null && now.difference(lastActionTime!) < debounce) {
+            return false;
+          }
+          lastActionTime = now;
+
+          // 2. In-flight force-processing reentrancy guard
+          if (isForceProcessing) {
+            return false;
+          }
+          isForceProcessing = true;
+
+          try {
+            sentinelProcessingIds.add('0');
+            backendProcessingChainStarted++;
+            await backendWork();
+          } finally {
+            sentinelProcessingIds.remove('0');
+            isForceProcessing = false;
+          }
+          return true;
+        }
+
+        final start = DateTime(2026, 9, 20, 12, 0, 0);
+        final completer = Completer<void>();
+
+        // Press 1 at t=0ms: starts long-running backend processing
+        final press1Future = handleButtonPress(start, backendWork: () => completer.future);
+
+        // Press 2 at t=200ms: blocked by 400ms debounce
+        final press2Result = await handleButtonPress(
+          start.add(const Duration(milliseconds: 200)),
+          backendWork: () async {},
+        );
+        expect(press2Result, isFalse);
+        expect(backendProcessingChainStarted, equals(1));
+        expect(sentinelProcessingIds, equals(['0']));
+
+        // Press 3 at t=450ms: passes debounce (>400ms), but backend is STILL processing -> blocked by in-flight guard
+        final press3Result = await handleButtonPress(
+          start.add(const Duration(milliseconds: 450)),
+          backendWork: () async {},
+        );
+        expect(press3Result, isFalse);
+        expect(backendProcessingChainStarted, equals(1), reason: 'Must not start duplicate backend chain');
+        expect(sentinelProcessingIds.length, equals(1), reason: 'Must not add duplicate sentinel processing id 0');
+
+        // Finish backend work
+        completer.complete();
+        await press1Future;
+        expect(sentinelProcessingIds, isEmpty);
+
+        // Press 4 at t=700ms: backend complete, new press is properly admitted
+        final press4Result = await handleButtonPress(
+          start.add(const Duration(milliseconds: 700)),
+          backendWork: () async {},
+        );
+        expect(press4Result, isTrue);
+        expect(backendProcessingChainStarted, equals(2));
+      },
+    );
   });
 }
