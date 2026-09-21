@@ -301,12 +301,20 @@ void main() {
         await press1Future;
         expect(sentinelProcessingIds, isEmpty);
 
-        // Press 4 at t=700ms: backend complete, new press is properly admitted
+        // Press 4 at t=700ms: backend complete, but within 400ms debounce of press 3 (700-450=250ms) -> still blocked by debounce
         final press4Result = await handleButtonPress(
           start.add(const Duration(milliseconds: 700)),
           backendWork: () async {},
         );
-        expect(press4Result, isTrue);
+        expect(press4Result, isFalse);
+        expect(backendProcessingChainStarted, equals(1));
+
+        // Press 5 at t=900ms: backend complete and debounce expired (900-450=450ms > 400ms) -> properly admitted
+        final press5Result = await handleButtonPress(
+          start.add(const Duration(milliseconds: 900)),
+          backendWork: () async {},
+        );
+        expect(press5Result, isTrue);
         expect(backendProcessingChainStarted, equals(2));
       },
     );
