@@ -396,6 +396,8 @@ class _DeviceSettingsState extends State<DeviceSettings> {
     }
   }
 
+  String _getDoubleTapActionLabel(int action) => _getButtonActionLabel(action);
+
   void _showButtonActionSheet({
     required String title,
     required int currentAction,
@@ -829,7 +831,7 @@ class _DeviceSettingsState extends State<DeviceSettings> {
             _buildProfileStyleItem(
               icon: FontAwesomeIcons.handPointer,
               title: context.l10n.doubleTap,
-              chipValue: _getDoubleTapActionLabel(doubleTapAction),
+              chipValue: _getButtonActionLabel(doubleTapAction),
               onTap: _showDoubleTapActionSheet,
             ),
           ],
