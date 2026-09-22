@@ -396,8 +396,6 @@ class _DeviceSettingsState extends State<DeviceSettings> {
     }
   }
 
-  String _getDoubleTapActionLabel(int action) => _getButtonActionLabel(action);
-
   void _showButtonActionSheet({
     required String title,
     required int currentAction,
