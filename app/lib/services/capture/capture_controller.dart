@@ -1428,6 +1428,7 @@ class CaptureController extends ChangeNotifier
     _startVoiceCommandTimeout(deviceId);
     _playSpeakerHaptic(deviceId, 1);
   }
+
   Future<bool> streamAudioToWs(String deviceId, BleAudioCodec codec) async {
     final revision = _preferences.capturePolicy.revision;
     if (!_admitsCapture(revision)) return false;
